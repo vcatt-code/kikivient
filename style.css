@@ -1,0 +1,257 @@
+/* Kikivient? — charte GAAC
+   Fond charcoal, accent teal (lien du site), bleu logo, titres fins Segoe. */
+
+:root {
+  --sky-void:   #14171c;   /* fond de base, charcoal proche du panneau sombre du site */
+  --sky-deep:   #191d24;   /* fond dégradé bas */
+  --panel:      #1e2229;   /* surface carte */
+  --panel-2:    #262b33;   /* champs, éléments surélevés */
+  --line:       rgba(255,255,255,.07);
+  --line-soft:  rgba(255,255,255,.045);
+
+  --teal:       #34b3a8;   /* accent principal (couleur des liens du site) */
+  --teal-dim:   #2a8f86;
+  --blue:       #4a90d9;   /* bleu du logo GAAC */
+
+  --star:       #eef1f5;   /* texte principal */
+  --dust:       #98a2ad;   /* texte secondaire */
+  --dust-dim:   #6b747e;
+
+  --oui:        #4caf7d;
+  --non:        #e06b6b;
+  --peut:       #e0a94a;
+
+  --radius:     12px;
+  --radius-sm:  8px;
+  --shadow:     0 10px 30px rgba(0,0,0,.35);
+  --font: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  color: var(--star);
+  background:
+    radial-gradient(1px 1px at 20% 12%, rgba(255,255,255,.35), transparent 60%),
+    radial-gradient(1px 1px at 70% 8%,  rgba(255,255,255,.28), transparent 60%),
+    radial-gradient(1px 1px at 42% 22%, rgba(255,255,255,.22), transparent 60%),
+    radial-gradient(1px 1px at 85% 18%, rgba(255,255,255,.30), transparent 60%),
+    radial-gradient(1px 1px at 12% 30%, rgba(255,255,255,.18), transparent 60%),
+    linear-gradient(180deg, #10141b 0%, var(--sky-void) 22%, var(--sky-deep) 100%);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--teal); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.wrap { max-width: 920px; margin: 0 auto; padding: 0 20px 80px; }
+
+/* ---------- En-tête / wordmark ---------- */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; padding: 22px 0 18px; margin-bottom: 8px;
+}
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.brand__mark {
+  width: 40px; height: 40px; flex: 0 0 auto;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #24405f 0%, #0c1320 70%);
+  box-shadow: inset 0 0 0 1px rgba(74,144,217,.35), 0 0 18px rgba(52,179,168,.15);
+}
+.brand__name {
+  font-size: 1.5rem; font-weight: 300; letter-spacing: .04em;
+  white-space: nowrap;
+}
+.brand__name b { font-weight: 500; color: var(--star); }
+.brand__q { color: var(--teal); font-weight: 400; }
+.brand__tag { color: var(--dust); font-size: .82rem; letter-spacing: .02em; margin-top: 1px; }
+
+/* ---------- Titres ---------- */
+h1.page-title {
+  font-weight: 300; font-size: 2.1rem; letter-spacing: .01em;
+  margin: 8px 0 2px;
+}
+.subtle { color: var(--dust); }
+
+/* ---------- Cartes ---------- */
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 22px;
+  margin: 16px 0;
+}
+.card--flush { padding: 0; overflow: hidden; }
+
+/* ---------- Formulaires ---------- */
+.field { margin: 14px 0; }
+.field > label {
+  display: block; font-size: .82rem; color: var(--dust);
+  margin-bottom: 6px; letter-spacing: .02em;
+}
+.row { display: flex; gap: 14px; flex-wrap: wrap; }
+.row > .field { flex: 1 1 180px; margin: 0; }
+
+input[type=text], input[type=email], input[type=password],
+input[type=date], input[type=time], textarea, select {
+  width: 100%;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--star);
+  padding: 11px 12px;
+  font: inherit;
+  transition: border-color .15s, box-shadow .15s;
+}
+textarea { resize: vertical; min-height: 84px; }
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--teal-dim);
+  box-shadow: 0 0 0 3px rgba(52,179,168,.18);
+}
+::placeholder { color: var(--dust-dim); }
+
+/* ---------- Boutons ---------- */
+.btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  border: 1px solid transparent; border-radius: var(--radius-sm);
+  padding: 10px 16px; font: inherit; font-weight: 500;
+  cursor: pointer; transition: background .15s, border-color .15s, color .15s, opacity .15s;
+  background: transparent; color: var(--star);
+}
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn--primary { background: var(--teal); color: #06201e; }
+.btn--primary:hover:not(:disabled) { background: #3ec3b6; }
+.btn--ghost { border-color: var(--line); color: var(--star); }
+.btn--ghost:hover:not(:disabled) { border-color: var(--teal-dim); color: var(--teal); }
+.btn--danger { border-color: rgba(224,107,107,.4); color: var(--non); }
+.btn--danger:hover:not(:disabled) { background: rgba(224,107,107,.12); }
+.btn--sm { padding: 7px 11px; font-size: .84rem; font-weight: 500; }
+
+.actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+
+/* ---------- Cases / radios de config ---------- */
+.check {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border: 1px solid var(--line);
+  border-radius: var(--radius-sm); background: var(--panel-2);
+  cursor: pointer; user-select: none;
+}
+.check input { width: auto; accent-color: var(--teal); }
+.check-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* chips (options de rôles) */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: 999px; padding: 5px 6px 5px 12px; font-size: .85rem;
+}
+.chip button {
+  border: none; background: rgba(255,255,255,.06); color: var(--dust);
+  width: 20px; height: 20px; border-radius: 50%; cursor: pointer; line-height: 1;
+}
+.chip button:hover { background: rgba(224,107,107,.25); color: var(--non); }
+
+/* ---------- Badges ---------- */
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: .74rem; font-weight: 600; letter-spacing: .03em;
+  padding: 3px 9px; border-radius: 999px; text-transform: uppercase;
+}
+.badge--open   { background: rgba(76,175,125,.15); color: var(--oui); }
+.badge--closed { background: rgba(224,169,74,.15);  color: var(--peut); }
+.badge--arch   { background: rgba(152,162,173,.14); color: var(--dust); }
+
+.att { font-size: .78rem; font-weight: 600; padding: 2px 9px; border-radius: 999px; }
+.att--oui  { background: rgba(76,175,125,.16); color: var(--oui); }
+.att--non  { background: rgba(224,107,107,.16); color: var(--non); }
+.att--peut { background: rgba(224,169,74,.16);  color: var(--peut); }
+
+/* ---------- Tabs ---------- */
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 22px 0 6px; }
+.tab {
+  background: none; border: none; color: var(--dust); font: inherit;
+  padding: 10px 14px; cursor: pointer; border-bottom: 2px solid transparent;
+}
+.tab:hover { color: var(--star); }
+.tab.is-active { color: var(--teal); border-bottom-color: var(--teal); }
+
+/* ---------- Liste de sondages (admin) ---------- */
+.poll {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--panel); margin: 12px 0;
+}
+.poll__head { min-width: 0; }
+.poll__title { font-size: 1.08rem; font-weight: 500; margin: 0 0 3px; }
+.poll__meta { color: var(--dust); font-size: .88rem; }
+.poll__count { color: var(--teal); font-size: .84rem; margin-top: 6px; }
+.poll__actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+
+/* ---------- Réponses (participant) ---------- */
+.summary { display: flex; gap: 10px; flex-wrap: wrap; margin: 4px 0 4px; }
+.stat {
+  display: flex; align-items: baseline; gap: 7px;
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 9px 14px;
+}
+.stat b { font-size: 1.25rem; font-weight: 500; }
+.stat span { color: var(--dust); font-size: .82rem; }
+
+.resp {
+  padding: 13px 16px; border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm); background: var(--panel-2); margin: 10px 0;
+}
+.resp__top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.resp__name { font-weight: 500; }
+.resp__mine { font-size: .72rem; color: var(--teal); border: 1px solid var(--teal-dim); border-radius: 999px; padding: 1px 8px; }
+.resp__roles { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tag {
+  font-size: .76rem; color: var(--blue);
+  background: rgba(74,144,217,.12); border-radius: 999px; padding: 2px 9px;
+}
+.resp__mat { color: var(--dust); font-size: .86rem; margin-top: 8px; }
+.resp__mat b { color: var(--star); font-weight: 500; }
+.resp__comment { color: var(--dust); font-size: .9rem; margin-top: 8px; font-style: italic; }
+
+/* ---------- Divers ---------- */
+.notice {
+  padding: 12px 16px; border-radius: var(--radius-sm);
+  background: rgba(224,169,74,.1); border: 1px solid rgba(224,169,74,.25);
+  color: var(--peut); font-size: .92rem; margin: 12px 0;
+}
+.empty { color: var(--dust); text-align: center; padding: 34px 10px; }
+.divider { height: 1px; background: var(--line); border: 0; margin: 22px 0; }
+.hint { color: var(--dust-dim); font-size: .8rem; margin-top: 6px; }
+
+.toast {
+  position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px);
+  background: #0f2320; color: #bff3ec; border: 1px solid var(--teal-dim);
+  padding: 11px 18px; border-radius: 999px; font-size: .9rem;
+  opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 50;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+.hidden { display: none !important; }
+
+@media (max-width: 560px) {
+  .brand__name { font-size: 1.3rem; }
+  h1.page-title { font-size: 1.7rem; }
+  .check-grid { grid-template-columns: 1fr; }
+  .poll { flex-direction: column; }
+  .poll__actions { justify-content: flex-start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}

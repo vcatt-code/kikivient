@@ -1,0 +1,40 @@
+rules_version = '2';
+
+// ============================================================
+//  Kikivient? — Règles de sécurité Firestore
+//  À coller dans : Console Firebase > Firestore > Règles.
+//  Ajoutez vos e-mails admin dans la liste ci-dessous.
+// ============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // -> Modifiez cette liste avec les e-mails des organisateurs
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email in ['cattelain.vincent@gmail.com'];
+    }
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    match /polls/{pollId} {
+      // Tout le monde peut lire un sondage via son lien.
+      allow read: if true;
+      // Seuls les admins créent / modifient / suppriment les sondages.
+      allow create, update, delete: if isAdmin();
+
+      match /responses/{responseId} {
+        // Les réponses sont publiques (voir qui s'inscrit).
+        allow read: if true;
+        // Un participant (connecté, même anonymement) crée sa propre réponse.
+        allow create: if signedIn()
+          && request.resource.data.uid == request.auth.uid;
+        // On ne peut modifier / supprimer que sa propre réponse (ou admin).
+        allow update, delete: if isAdmin()
+          || (signedIn() && resource.data.uid == request.auth.uid);
+      }
+    }
+  }
+}

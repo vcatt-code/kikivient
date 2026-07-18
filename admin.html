@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Kikivient? — Administration</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="wrap">
+
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand__mark">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5aa0e6" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 3l6 3-9 15-3-1.4z"/><path d="M8.5 16.5L5 18l1.5-3.5"/><circle cx="17" cy="4.5" r=".6" fill="#5aa0e6"/>
+          </svg>
+        </span>
+        <div>
+          <div class="brand__name"><b>Kiki</b>vient<span class="brand__q">?</span></div>
+          <div class="brand__tag">Administration · GAAC</div>
+        </div>
+      </div>
+      <button id="logout" class="btn btn--ghost btn--sm hidden">Se déconnecter</button>
+    </header>
+
+    <!-- Connexion -->
+    <section id="login" class="card hidden">
+      <h1 class="page-title">Connexion</h1>
+      <p class="subtle">Réservé aux organisateurs des sondages.</p>
+      <div class="field">
+        <label for="email">Adresse e-mail</label>
+        <input type="email" id="email" autocomplete="username" placeholder="vous@astrogaac.fr">
+      </div>
+      <div class="field">
+        <label for="password">Mot de passe</label>
+        <input type="password" id="password" autocomplete="current-password" placeholder="••••••••">
+      </div>
+      <div class="actions">
+        <button id="loginBtn" class="btn btn--primary">Se connecter</button>
+      </div>
+      <p id="loginError" class="notice hidden"></p>
+    </section>
+
+    <!-- Tableau de bord -->
+    <section id="dashboard" class="hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+        <h1 class="page-title">Sondages</h1>
+        <button id="newBtn" class="btn btn--primary">+ Nouveau sondage</button>
+      </div>
+
+      <!-- Formulaire création / édition -->
+      <div id="formCard" class="card hidden">
+        <h2 id="formTitle" style="font-weight:400;margin-top:0">Nouveau sondage</h2>
+
+        <div class="field">
+          <label for="title">Nom de l'évènement</label>
+          <input type="text" id="title" placeholder="Nuit Astro de Grévillers">
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="date">Date</label>
+            <input type="date" id="date">
+          </div>
+          <div class="field">
+            <label for="time">Horaire</label>
+            <input type="time" id="time">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="description">Commentaire / détails</label>
+          <textarea id="description" placeholder="Point de rendez-vous, matériel commun, météo…"></textarea>
+        </div>
+
+        <hr class="divider">
+
+        <label class="check" style="margin-bottom:12px">
+          <input type="checkbox" id="askAttendance" checked>
+          <span>Demander la présence (oui / non / peut-être)</span>
+        </label>
+
+        <div class="field">
+          <label>Options de participation (cases à cocher pour les inscrits)</label>
+          <div class="row" style="gap:8px">
+            <input type="text" id="roleInput" placeholder="Ex. Animer l'atelier" style="flex:1 1 auto">
+            <button id="addRole" class="btn btn--ghost">Ajouter</button>
+          </div>
+          <div class="chips" id="roleSuggest">
+            <button class="chip" data-add="Animer l'atelier" style="cursor:pointer">+ Animer l'atelier</button>
+            <button class="chip" data-add="Aider à l'installation" style="cursor:pointer">+ Aider à l'installation</button>
+            <button class="chip" data-add="Prêter du matériel" style="cursor:pointer">+ Prêter du matériel</button>
+          </div>
+          <div class="chips" id="roleChips"></div>
+        </div>
+
+        <label class="check">
+          <input type="checkbox" id="askMaterial">
+          <span>Champ « Matériel apporté » (texte libre)</span>
+        </label>
+
+        <div class="actions" style="margin-top:18px">
+          <button id="saveBtn" class="btn btn--primary">Créer le sondage</button>
+          <button id="cancelBtn" class="btn btn--ghost">Annuler</button>
+        </div>
+        <p id="formError" class="notice hidden"></p>
+      </div>
+
+      <div class="tabs">
+        <button class="tab is-active" data-tab="open">Actifs</button>
+        <button class="tab" data-tab="closed">Clôturés</button>
+        <button class="tab" data-tab="archived">Archivés</button>
+      </div>
+
+      <div id="pollList"></div>
+    </section>
+
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script type="module">
+    import { db, auth, ADMIN_EMAILS } from "./firebase-config.js";
+    import {
+      collection, addDoc, updateDoc, deleteDoc, doc, getDocs,
+      onSnapshot, query, orderBy, serverTimestamp, getCountFromServer, writeBatch
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import {
+      signInWithEmailAndPassword, signOut, onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    const $ = id => document.getElementById(id);
+    const loginSec = $("login"), dash = $("dashboard");
+    let unsubPolls = null, editingId = null, activeTab = "open", roleOptions = [];
+
+    function toast(msg) {
+      const t = $("toast"); t.textContent = msg; t.classList.add("show");
+      setTimeout(() => t.classList.remove("show"), 2200);
+    }
+    const esc = s => (s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+
+    function frDate(d) {
+      if (!d) return "";
+      const [y, m, day] = d.split("-").map(Number);
+      return new Date(y, m - 1, day).toLocaleDateString("fr-FR",
+        { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    }
+    function pollLink(id) { return new URL("index.html?id=" + id, location.href).href; }
+
+    /* ---------- Authentification ---------- */
+    onAuthStateChanged(auth, user => {
+      const isAdmin = user && !user.isAnonymous && ADMIN_EMAILS.includes(user.email);
+      if (isAdmin) {
+        loginSec.classList.add("hidden");
+        dash.classList.remove("hidden");
+        $("logout").classList.remove("hidden");
+        watchPolls();
+      } else {
+        if (user && !user.isAnonymous) {
+          signOut(auth);
+          showLoginError("Ce compte n'est pas autorisé.");
+        }
+        dash.classList.add("hidden");
+        $("logout").classList.add("hidden");
+        loginSec.classList.remove("hidden");
+        if (unsubPolls) { unsubPolls(); unsubPolls = null; }
+      }
+    });
+
+    function showLoginError(m) { const e = $("loginError"); e.textContent = m; e.classList.remove("hidden"); }
+
+    $("loginBtn").onclick = async () => {
+      $("loginError").classList.add("hidden");
+      try {
+        await signInWithEmailAndPassword(auth, $("email").value.trim(), $("password").value);
+      } catch (e) {
+        showLoginError("Connexion impossible. Vérifiez l'e-mail et le mot de passe.");
+      }
+    };
+    $("password").addEventListener("keydown", e => { if (e.key === "Enter") $("loginBtn").click(); });
+    $("logout").onclick = () => signOut(auth);
+
+    /* ---------- Formulaire ---------- */
+    $("newBtn").onclick = () => openForm();
+    $("cancelBtn").onclick = () => closeForm();
+
+    function openForm(data = null) {
+      editingId = data?.id || null;
+      $("formTitle").textContent = editingId ? "Modifier le sondage" : "Nouveau sondage";
+      $("saveBtn").textContent = editingId ? "Enregistrer les modifications" : "Créer le sondage";
+      $("title").value = data?.title || "";
+      $("date").value = data?.date || "";
+      $("time").value = data?.time || "";
+      $("description").value = data?.description || "";
+      $("askAttendance").checked = data ? !!data.askAttendance : true;
+      $("askMaterial").checked = data ? !!data.askMaterial : false;
+      roleOptions = Array.isArray(data?.roleOptions) ? [...data.roleOptions] : [];
+      renderChips();
+      $("formError").classList.add("hidden");
+      $("formCard").classList.remove("hidden");
+      $("formCard").scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    function closeForm() { $("formCard").classList.add("hidden"); editingId = null; }
+
+    function renderChips() {
+      $("roleChips").innerHTML = roleOptions.map((r, i) =>
+        `<span class="chip">${esc(r)}<button data-i="${i}" title="Retirer">×</button></span>`).join("");
+      $("roleChips").querySelectorAll("button").forEach(b =>
+        b.onclick = () => { roleOptions.splice(+b.dataset.i, 1); renderChips(); });
+    }
+    function addRole(v) {
+      v = (v || "").trim();
+      if (v && !roleOptions.includes(v)) { roleOptions.push(v); renderChips(); }
+    }
+    $("addRole").onclick = () => { addRole($("roleInput").value); $("roleInput").value = ""; $("roleInput").focus(); };
+    $("roleInput").addEventListener("keydown", e => {
+      if (e.key === "Enter") { e.preventDefault(); $("addRole").click(); }
+    });
+    $("roleSuggest").querySelectorAll("[data-add]").forEach(b =>
+      b.onclick = () => addRole(b.dataset.add));
+
+    $("saveBtn").onclick = async () => {
+      const title = $("title").value.trim(), date = $("date").value;
+      if (!title || !date) {
+        const e = $("formError");
+        e.textContent = "Le nom de l'évènement et la date sont obligatoires.";
+        e.classList.remove("hidden");
+        return;
+      }
+      const payload = {
+        title, date, time: $("time").value || "",
+        description: $("description").value.trim(),
+        askAttendance: $("askAttendance").checked,
+        askMaterial: $("askMaterial").checked,
+        roleOptions: [...roleOptions]
+      };
+      try {
+        if (editingId) {
+          await updateDoc(doc(db, "polls", editingId), payload);
+          toast("Sondage mis à jour");
+        } else {
+          await addDoc(collection(db, "polls"), {
+            ...payload, status: "open",
+            createdAt: serverTimestamp(), createdBy: auth.currentUser.uid
+          });
+          toast("Sondage créé");
+        }
+        closeForm();
+      } catch (e) {
+        const el = $("formError");
+        el.textContent = "Enregistrement impossible. Réessayez.";
+        el.classList.remove("hidden");
+      }
+    };
+
+    /* ---------- Onglets ---------- */
+    document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
+      document.querySelectorAll(".tab").forEach(x => x.classList.remove("is-active"));
+      t.classList.add("is-active");
+      activeTab = t.dataset.tab;
+      renderPolls();
+    });
+
+    /* ---------- Liste des sondages ---------- */
+    let pollsCache = [];
+    function watchPolls() {
+      if (unsubPolls) return;
+      const q = query(collection(db, "polls"), orderBy("date", "desc"));
+      unsubPolls = onSnapshot(q, snap => {
+        pollsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderPolls();
+      });
+    }
+
+    function renderPolls() {
+      const list = pollsCache.filter(p => (p.status || "open") === activeTab);
+      const el = $("pollList");
+      if (!list.length) {
+        el.innerHTML = `<p class="empty">Aucun sondage dans cette catégorie.</p>`;
+        return;
+      }
+      el.innerHTML = list.map(p => {
+        const meta = frDate(p.date) + (p.time ? ` · ${p.time}` : "");
+        const badge = p.status === "closed"
+          ? `<span class="badge badge--closed">Clôturé</span>`
+          : p.status === "archived"
+          ? `<span class="badge badge--arch">Archivé</span>`
+          : `<span class="badge badge--open">Ouvert</span>`;
+        return `<div class="poll">
+          <div class="poll__head">
+            <div class="poll__title">${esc(p.title)} ${badge}</div>
+            <div class="poll__meta">${meta}</div>
+            <div class="poll__count" id="c-${p.id}">…</div>
+          </div>
+          <div class="poll__actions">${actionsFor(p)}</div>
+        </div>`;
+      }).join("");
+
+      el.querySelectorAll("[data-act]").forEach(b =>
+        b.onclick = () => handleAction(b.dataset.act, b.dataset.id));
+      list.forEach(p => fillCount(p.id));
+    }
+
+    function actionsFor(p) {
+      const id = p.id, s = p.status || "open";
+      const copy = `<button class="btn btn--ghost btn--sm" data-act="copy" data-id="${id}">Copier le lien</button>`;
+      const view = `<button class="btn btn--ghost btn--sm" data-act="view" data-id="${id}">Voir</button>`;
+      const edit = `<button class="btn btn--ghost btn--sm" data-act="edit" data-id="${id}">Éditer</button>`;
+      const del  = `<button class="btn btn--danger btn--sm" data-act="delete" data-id="${id}">Supprimer</button>`;
+      if (s === "open")
+        return copy + view + edit +
+          `<button class="btn btn--ghost btn--sm" data-act="close" data-id="${id}">Clôturer</button>` +
+          `<button class="btn btn--ghost btn--sm" data-act="archive" data-id="${id}">Archiver</button>` + del;
+      if (s === "closed")
+        return copy + view +
+          `<button class="btn btn--ghost btn--sm" data-act="reopen" data-id="${id}">Rouvrir</button>` +
+          `<button class="btn btn--ghost btn--sm" data-act="archive" data-id="${id}">Archiver</button>` + del;
+      return view +
+        `<button class="btn btn--ghost btn--sm" data-act="reopen" data-id="${id}">Réactiver</button>` + del;
+    }
+
+    async function fillCount(id) {
+      try {
+        const c = await getCountFromServer(collection(db, "polls", id, "responses"));
+        const n = c.data().count;
+        const el = $("c-" + id);
+        if (el) el.textContent = n === 0 ? "Aucune réponse" : n + (n > 1 ? " réponses" : " réponse");
+      } catch { const el = $("c-" + id); if (el) el.textContent = ""; }
+    }
+
+    async function handleAction(act, id) {
+      const p = pollsCache.find(x => x.id === id);
+      if (act === "copy") {
+        try { await navigator.clipboard.writeText(pollLink(id)); toast("Lien copié"); }
+        catch { prompt("Lien du sondage :", pollLink(id)); }
+      } else if (act === "view") {
+        window.open(pollLink(id), "_blank");
+      } else if (act === "edit") {
+        openForm(p);
+      } else if (act === "close") {
+        await updateDoc(doc(db, "polls", id), { status: "closed" }); toast("Sondage clôturé");
+      } else if (act === "reopen") {
+        await updateDoc(doc(db, "polls", id), { status: "open" }); toast("Sondage rouvert");
+      } else if (act === "archive") {
+        await updateDoc(doc(db, "polls", id), { status: "archived" }); toast("Sondage archivé");
+      } else if (act === "delete") {
+        if (!confirm(`Supprimer définitivement « ${p.title} » et toutes ses réponses ?`)) return;
+        await deletePoll(id); toast("Sondage supprimé");
+      }
+    }
+
+    async function deletePoll(id) {
+      const resp = await getDocs(collection(db, "polls", id, "responses"));
+      const batch = writeBatch(db);
+      resp.forEach(r => batch.delete(r.ref));
+      batch.delete(doc(db, "polls", id));
+      await batch.commit();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kikivient?</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="wrap">
+
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand__mark">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5aa0e6" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 3l6 3-9 15-3-1.4z"/><path d="M8.5 16.5L5 18l1.5-3.5"/><circle cx="17" cy="4.5" r=".6" fill="#5aa0e6"/>
+          </svg>
+        </span>
+        <div>
+          <div class="brand__name"><b>Kiki</b>vient<span class="brand__q">?</span></div>
+          <div class="brand__tag">GAAC · inscriptions</div>
+        </div>
+      </div>
+    </header>
+
+    <main id="app">
+      <p class="empty">Chargement…</p>
+    </main>
+
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script type="module">
+    import { db, auth, ADMIN_EMAILS } from "./firebase-config.js";
+    import {
+      doc, getDoc, collection, addDoc, updateDoc, deleteDoc,
+      onSnapshot, query, orderBy, where, getDocs, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { signInAnonymously, onAuthStateChanged }
+      from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    const app = document.getElementById("app");
+    const pollId = new URLSearchParams(location.search).get("id");
+    let me = null, poll = null, myResp = null, isMod = false, started = false;
+
+    const esc = s => (s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+    function toast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg; t.classList.add("show");
+      setTimeout(() => t.classList.remove("show"), 2200);
+    }
+    function frDate(d) {
+      if (!d) return "";
+      const [y, m, day] = d.split("-").map(Number);
+      return new Date(y, m - 1, day).toLocaleDateString("fr-FR",
+        { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    }
+    const ATT = { oui: ["Présent·e", "oui"], non: ["Absent·e", "non"], peut: ["Peut-être", "peut"] };
+
+    /* ---------- Auth (anonyme pour les participants) ---------- */
+    onAuthStateChanged(auth, user => {
+      if (!user) { signInAnonymously(auth).catch(() => fatal("Connexion au service impossible.")); return; }
+      me = user;
+      isMod = !user.isAnonymous && ADMIN_EMAILS.includes(user.email);
+      if (!started) { started = true; init(); }
+    });
+
+    function fatal(msg) { app.innerHTML = `<div class="card"><p class="empty">${esc(msg)}</p></div>`; }
+
+    async function init() {
+      if (!pollId) return fatal("Aucun sondage indiqué dans le lien.");
+      let snap;
+      try { snap = await getDoc(doc(db, "polls", pollId)); }
+      catch { return fatal("Impossible de charger le sondage."); }
+      if (!snap.exists()) return fatal("Ce sondage est introuvable ou a été supprimé.");
+      poll = { id: snap.id, ...snap.data() };
+      render();
+      watchResponses();
+    }
+
+    /* ---------- Rendu de la page ---------- */
+    function render() {
+      const open = (poll.status || "open") === "open";
+      const meta = frDate(poll.date) + (poll.time ? ` · ${poll.time}` : "");
+      const statusNote = open ? "" :
+        `<div class="notice">Ce sondage est ${poll.status === "archived" ? "archivé" : "clôturé"}. Les inscriptions sont closes, mais vous pouvez voir les réponses.</div>`;
+
+      app.innerHTML = `
+        <div class="card">
+          <h1 class="page-title" style="margin-top:4px">${esc(poll.title)}</h1>
+          <p class="subtle" style="text-transform:capitalize;margin-top:0">${esc(meta)}</p>
+          ${poll.description ? `<p style="white-space:pre-wrap;margin-top:12px">${esc(poll.description)}</p>` : ""}
+          ${statusNote}
+        </div>
+        ${open ? `<div class="card" id="formCard"></div>` : ""}
+        <h2 style="font-weight:300;margin:26px 0 8px">Qui vient&nbsp;?</h2>
+        <div class="summary" id="summary"></div>
+        <div id="respList"></div>
+      `;
+      if (open) renderForm();
+    }
+
+    function renderForm() {
+      const c = document.getElementById("formCard");
+      const editing = !!myResp;
+      let html = `<h2 style="font-weight:400;margin-top:0">${editing ? "Modifier ma réponse" : "Je m'inscris"}</h2>
+        <div class="field">
+          <label for="name">Votre nom</label>
+          <input type="text" id="name" placeholder="Prénom Nom" value="${esc(myResp?.name || "")}">
+        </div>`;
+
+      if (poll.askAttendance) {
+        const cur = myResp?.attendance || "";
+        html += `<div class="field"><label>Présence</label><div class="check-grid" style="grid-template-columns:1fr 1fr 1fr">
+          ${["oui", "non", "peut"].map(k => `
+            <label class="check"><input type="radio" name="att" value="${k}" ${cur === k ? "checked" : ""}>
+            <span>${ATT[k][0]}</span></label>`).join("")}
+        </div></div>`;
+      }
+
+      if (Array.isArray(poll.roleOptions) && poll.roleOptions.length) {
+        const mine = myResp?.roles || [];
+        html += `<div class="field"><label>Je peux aussi</label><div class="check-grid">
+          ${poll.roleOptions.map((r, i) => `
+            <label class="check"><input type="checkbox" name="role" value="${esc(r)}" ${mine.includes(r) ? "checked" : ""}>
+            <span>${esc(r)}</span></label>`).join("")}
+        </div></div>`;
+      }
+
+      if (poll.askMaterial) {
+        html += `<div class="field"><label for="material">Matériel apporté</label>
+          <input type="text" id="material" placeholder="Télescope, jumelles, oculaires…" value="${esc(myResp?.material || "")}"></div>`;
+      }
+
+      html += `<div class="field"><label for="comment">Commentaire</label>
+        <textarea id="comment" placeholder="Un mot pour le groupe (optionnel)">${esc(myResp?.comment || "")}</textarea></div>
+        <div class="actions">
+          <button id="submit" class="btn btn--primary">${editing ? "Mettre à jour ma réponse" : "M'inscrire"}</button>
+          ${editing ? `<button id="remove" class="btn btn--danger">Retirer ma réponse</button>` : ""}
+        </div>`;
+
+      c.innerHTML = html;
+      document.getElementById("submit").onclick = submit;
+      if (editing) document.getElementById("remove").onclick = removeMine;
+    }
+
+    async function submit() {
+      const name = document.getElementById("name").value.trim();
+      if (!name) { toast("Indiquez votre nom"); return; }
+      const att = poll.askAttendance
+        ? (document.querySelector('input[name=att]:checked')?.value || "") : "";
+      if (poll.askAttendance && !att) { toast("Indiquez votre présence"); return; }
+      const roles = [...document.querySelectorAll('input[name=role]:checked')].map(x => x.value);
+      const material = poll.askMaterial ? (document.getElementById("material").value.trim()) : "";
+      const comment = document.getElementById("comment").value.trim();
+
+      const data = { uid: me.uid, name, attendance: att, roles, material, comment, updatedAt: serverTimestamp() };
+      const btn = document.getElementById("submit"); btn.disabled = true;
+      try {
+        if (myResp) {
+          await updateDoc(doc(db, "polls", pollId, "responses", myResp.id), data);
+          toast("Réponse mise à jour");
+        } else {
+          await addDoc(collection(db, "polls", pollId, "responses"),
+            { ...data, createdAt: serverTimestamp() });
+          toast("Inscription enregistrée");
+        }
+      } catch (e) {
+        toast("Enregistrement impossible");
+      } finally { btn.disabled = false; }
+    }
+
+    async function removeMine() {
+      if (!myResp || !confirm("Retirer votre réponse ?")) return;
+      try { await deleteDoc(doc(db, "polls", pollId, "responses", myResp.id)); toast("Réponse retirée"); }
+      catch { toast("Suppression impossible"); }
+    }
+
+    /* ---------- Réponses en direct ---------- */
+    function watchResponses() {
+      const q = query(collection(db, "polls", pollId, "responses"), orderBy("createdAt", "asc"));
+      onSnapshot(q, snap => {
+        const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const prevHadMine = !!myResp;
+        myResp = rows.find(r => r.uid === me.uid) || null;
+        // Reconstruire le formulaire seulement si l'état "ma réponse" a changé
+        if (document.getElementById("formCard") && (!!myResp !== prevHadMine)) renderForm();
+        renderResponses(rows);
+      });
+    }
+
+    function renderResponses(rows) {
+      const sum = document.getElementById("summary");
+      if (poll.askAttendance) {
+        const n = k => rows.filter(r => r.attendance === k).length;
+        sum.innerHTML =
+          `<div class="stat"><b>${n("oui")}</b><span>présent·e·s</span></div>
+           <div class="stat"><b>${n("peut")}</b><span>peut-être</span></div>
+           <div class="stat"><b>${n("non")}</b><span>absent·e·s</span></div>`;
+      } else {
+        sum.innerHTML = `<div class="stat"><b>${rows.length}</b><span>inscrit·e·s</span></div>`;
+      }
+
+      const list = document.getElementById("respList");
+      if (!rows.length) { list.innerHTML = `<p class="empty">Personne pour l'instant. Soyez le premier à vous inscrire.</p>`; return; }
+
+      list.innerHTML = rows.map(r => {
+        const mine = r.uid === me.uid;
+        const att = r.attendance && ATT[r.attendance]
+          ? `<span class="att att--${ATT[r.attendance][1]}">${ATT[r.attendance][0]}</span>` : "";
+        const roles = (r.roles || []).map(x => `<span class="tag">${esc(x)}</span>`).join("");
+        const del = (mine || isMod)
+          ? `<button class="btn btn--danger btn--sm" data-del="${r.id}" style="margin-left:auto">Retirer</button>` : "";
+        return `<div class="resp">
+          <div class="resp__top">
+            <span class="resp__name">${esc(r.name)}</span>
+            ${mine ? `<span class="resp__mine">moi</span>` : ""}
+            ${att}${del}
+          </div>
+          ${roles ? `<div class="resp__roles">${roles}</div>` : ""}
+          ${r.material ? `<div class="resp__mat"><b>Matériel :</b> ${esc(r.material)}</div>` : ""}
+          ${r.comment ? `<div class="resp__comment">« ${esc(r.comment)} »</div>` : ""}
+        </div>`;
+      }).join("");
+
+      list.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
+        const rid = b.dataset.del;
+        if (!confirm("Retirer cette réponse ?")) return;
+        try { await deleteDoc(doc(db, "polls", pollId, "responses", rid)); toast("Réponse retirée"); }
+        catch { toast("Suppression impossible"); }
+      });
+    }
+  </script>
+</body>
+</html>
