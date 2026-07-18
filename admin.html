@@ -12,11 +12,7 @@
 
     <header class="topbar">
       <div class="brand">
-        <span class="brand__mark">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5aa0e6" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 3l6 3-9 15-3-1.4z"/><path d="M8.5 16.5L5 18l1.5-3.5"/><circle cx="17" cy="4.5" r=".6" fill="#5aa0e6"/>
-          </svg>
-        </span>
+        <span class="brand__mark"><img src="gaac-logo.png" alt="GAAC"></span>
         <div>
           <div class="brand__name"><b>Kiki</b>vient<span class="brand__q">?</span></div>
           <div class="brand__tag">Administration · GAAC</div>
@@ -51,8 +47,9 @@
       </div>
 
       <!-- Formulaire création / édition -->
-      <div id="formCard" class="card hidden">
-        <h2 id="formTitle" style="font-weight:400;margin-top:0">Nouveau sondage</h2>
+      <div id="formCard" class="card card--light hidden">
+        <div class="form-logo"><img src="gaac-logo.png" alt="GAAC"></div>
+        <h2 id="formTitle" style="font-weight:400;margin-top:0;text-align:center">Nouveau sondage</h2>
 
         <div class="field">
           <label for="title">Nom de l'évènement</label>
@@ -73,6 +70,22 @@
         <div class="field">
           <label for="description">Commentaire / détails</label>
           <textarea id="description" placeholder="Point de rendez-vous, matériel commun, météo…"></textarea>
+        </div>
+
+        <div class="field">
+          <label>Image d'illustration (optionnel)</label>
+          <div class="row" style="gap:8px">
+            <input type="url" id="imageUrl" placeholder="Coller un lien d'image (https://…)" style="flex:1 1 auto">
+            <label class="btn btn--ghost" style="white-space:nowrap;cursor:pointer">
+              Déposer un fichier
+              <input type="file" id="imageFile" accept="image/*" hidden>
+            </label>
+          </div>
+          <div class="hint">Un lien direct vers une image, ou un fichier depuis votre appareil (redimensionné automatiquement).</div>
+          <div class="img-preview hidden" id="imgPreview">
+            <img id="imgPreviewEl" alt="Aperçu">
+            <div class="actions"><button type="button" id="imgRemove" class="btn btn--danger btn--sm">Retirer l'image</button></div>
+          </div>
         </div>
 
         <hr class="divider">
@@ -133,7 +146,7 @@
 
     const $ = id => document.getElementById(id);
     const loginSec = $("login"), dash = $("dashboard");
-    let unsubPolls = null, editingId = null, activeTab = "open", roleOptions = [];
+    let unsubPolls = null, editingId = null, activeTab = "open", roleOptions = [], currentImage = null;
 
     function toast(msg) {
       const t = $("toast"); t.textContent = msg; t.classList.add("show");
@@ -198,6 +211,10 @@
       $("askMaterial").checked = data ? !!data.askMaterial : false;
       roleOptions = Array.isArray(data?.roleOptions) ? [...data.roleOptions] : [];
       renderChips();
+      currentImage = data?.image || null;
+      $("imageUrl").value = (currentImage && /^https?:/i.test(currentImage)) ? currentImage : "";
+      $("imageFile").value = "";
+      if (currentImage) showImgPreview(currentImage); else hideImgPreview();
       $("formError").classList.add("hidden");
       $("formCard").classList.remove("hidden");
       $("formCard").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -221,6 +238,41 @@
     $("roleSuggest").querySelectorAll("[data-add]").forEach(b =>
       b.onclick = () => addRole(b.dataset.add));
 
+    /* ---------- Image d'illustration ---------- */
+    function showImgPreview(src) { $("imgPreviewEl").src = src; $("imgPreview").classList.remove("hidden"); }
+    function hideImgPreview() { $("imgPreview").classList.add("hidden"); $("imgPreviewEl").removeAttribute("src"); }
+
+    function compressImage(file) {
+      return new Promise((resolve, reject) => {
+        const img = new Image(), url = URL.createObjectURL(file);
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          let w = img.width, h = img.height, max = 1200;
+          if (w > max || h > max) { const s = Math.min(max / w, max / h); w = Math.round(w * s); h = Math.round(h * s); }
+          const c = document.createElement("canvas"); c.width = w; c.height = h;
+          c.getContext("2d").drawImage(img, 0, 0, w, h);
+          let q = 0.82, data = c.toDataURL("image/jpeg", q);
+          while (data.length > 900000 && q > 0.4) { q -= 0.12; data = c.toDataURL("image/jpeg", q); }
+          if (data.length > 900000) reject(new Error("trop lourde")); else resolve(data);
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("lecture")); };
+        img.src = url;
+      });
+    }
+
+    $("imageFile").onchange = async e => {
+      const f = e.target.files[0]; if (!f) return;
+      try {
+        const data = await compressImage(f);
+        currentImage = data; $("imageUrl").value = ""; showImgPreview(data); toast("Image ajoutée");
+      } catch { toast("Image trop lourde — utilisez plutôt un lien"); $("imageFile").value = ""; }
+    };
+    $("imageUrl").addEventListener("change", () => {
+      const v = $("imageUrl").value.trim();
+      if (v) { currentImage = v; showImgPreview(v); } else if (!/^data:/.test(currentImage || "")) { currentImage = null; hideImgPreview(); }
+    });
+    $("imgRemove").onclick = () => { currentImage = null; $("imageUrl").value = ""; $("imageFile").value = ""; hideImgPreview(); };
+
     $("saveBtn").onclick = async () => {
       const title = $("title").value.trim(), date = $("date").value;
       if (!title || !date) {
@@ -232,6 +284,7 @@
       const payload = {
         title, date, time: $("time").value || "",
         description: $("description").value.trim(),
+        image: currentImage || "",
         askAttendance: $("askAttendance").checked,
         askMaterial: $("askMaterial").checked,
         roleOptions: [...roleOptions]

@@ -14,6 +14,15 @@ Infrastructure : **GitHub Pages** (hébergement statique) + **Firebase Firestore
 | `style.css` | Charte graphique GAAC |
 | `firebase-config.js` | **À éditer** : clés du projet Firebase + e-mails admin |
 | `firestore.rules` | Règles de sécurité à publier dans la console |
+| `gaac-logo.png` | Logo GAAC affiché dans l'en-tête et le formulaire (à déposer aussi dans le dépôt) |
+
+## Ajouter un second administrateur
+1. Firebase > **Authentication > Users > Ajouter un utilisateur** : créez le compte (e-mail + mot de passe).
+2. Ajoutez cette adresse **dans les deux fichiers** : `firebase-config.js` (`ADMIN_EMAILS`) et `firestore.rules` (liste de `isAdmin`). Les deux listes doivent rester identiques.
+3. Republiez les règles (Firestore > Règles > Publier).
+
+## Image d'illustration
+Un sondage peut porter une image (lien direct ou fichier). Les fichiers déposés sont redimensionnés puis stockés directement dans Firestore : pas besoin d'activer Storage ni de passer au plan payant. Pour une image lourde, préférez un lien.
 
 ## Installation
 

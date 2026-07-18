@@ -11,11 +11,7 @@
 
     <header class="topbar">
       <div class="brand">
-        <span class="brand__mark">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5aa0e6" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 3l6 3-9 15-3-1.4z"/><path d="M8.5 16.5L5 18l1.5-3.5"/><circle cx="17" cy="4.5" r=".6" fill="#5aa0e6"/>
-          </svg>
-        </span>
+        <span class="brand__mark"><img src="gaac-logo.png" alt="GAAC"></span>
         <div>
           <div class="brand__name"><b>Kiki</b>vient<span class="brand__q">?</span></div>
           <div class="brand__tag">GAAC · inscriptions</div>
@@ -88,12 +84,13 @@
 
       app.innerHTML = `
         <div class="card">
+          ${poll.image ? `<img class="poll-illus" src="${esc(poll.image)}" alt="">` : ""}
           <h1 class="page-title" style="margin-top:4px">${esc(poll.title)}</h1>
           <p class="subtle" style="text-transform:capitalize;margin-top:0">${esc(meta)}</p>
           ${poll.description ? `<p style="white-space:pre-wrap;margin-top:12px">${esc(poll.description)}</p>` : ""}
           ${statusNote}
         </div>
-        ${open ? `<div class="card" id="formCard"></div>` : ""}
+        ${open ? `<div class="card card--light" id="formCard"></div>` : ""}
         <h2 style="font-weight:300;margin:26px 0 8px">Qui vient&nbsp;?</h2>
         <div class="summary" id="summary"></div>
         <div id="respList"></div>

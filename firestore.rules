@@ -9,10 +9,14 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // -> Modifiez cette liste avec les e-mails des organisateurs
+    // -> Liste des organisateurs (identique à ADMIN_EMAILS dans firebase-config.js).
+    //    Ajoutez une adresse en la mettant dans la liste, séparée par une virgule.
     function isAdmin() {
       return request.auth != null
-        && request.auth.token.email in ['cattelain.vincent@gmail.com'];
+        && request.auth.token.email in [
+          'cattelain.vincent@gmail.com'
+          , simon.lericque@wanadoo.fr
+        ];
     }
 
     function signedIn() {
